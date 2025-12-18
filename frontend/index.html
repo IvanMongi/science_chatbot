@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -86,6 +86,7 @@
       flex-wrap: wrap;
       gap: 10px;
       padding: 16px 16px 0;
+      align-items: center;
     }
 
     .pill {
@@ -100,6 +101,48 @@
     }
 
     .pill:hover { border-color: var(--accent-2); transform: translateY(-1px); }
+
+    .mode-toggle {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 40px;
+      height: 20px;
+      background: #cbd5e1;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 200ms ease;
+    }
+
+    .toggle-switch.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    }
+
+    .toggle-knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 200ms ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .toggle-switch.active .toggle-knob {
+      transform: translateX(20px);
+    }
 
     .chat {
       flex: 1;
@@ -213,16 +256,24 @@
       <h1>Science Chatbot</h1>
       <span class="badge">Beta</span>
     </div>
-    <p class="subtitle">Haz preguntas científicas y recibe respuestas con citas. (Por ahora: modo eco para probar el flujo).</p>
+    <p class="subtitle">Ask scientific questions and get answers with citations. (Currently in echo mode for testing).</p>
   </header>
 
   <main>
     <section class="card">
-      <div class="pill-row" id="suggestions"></div>
+      <div class="pill-row">
+        <div id="suggestions" style="display: flex; flex-wrap: wrap; gap: 10px; flex: 1;"></div>
+        <div class="mode-toggle">
+          <span id="mode-label">Echo Mode</span>
+          <div class="toggle-switch" id="mode-toggle">
+            <div class="toggle-knob"></div>
+          </div>
+        </div>
+      </div>
       <div class="chat" id="chat"></div>
       <form id="chat-form">
-        <textarea id="input" placeholder="Escribe tu pregunta científica..." required></textarea>
-        <button type="submit" id="send">Enviar</button>
+        <textarea id="input" placeholder="Type your scientific question..." required></textarea>
+        <button type="submit" id="send">Send</button>
       </form>
     </section>
   </main>
@@ -233,12 +284,16 @@
     const inputEl = document.getElementById('input');
     const sendBtn = document.getElementById('send');
     const suggestionsEl = document.getElementById('suggestions');
+    const modeToggleEl = document.getElementById('mode-toggle');
+    const modeLabelEl = document.getElementById('mode-label');
+
+    let useAgent = false;
 
     const prompts = [
-      '¿Qué evidencia respalda la materia oscura?',
-      'Explica el ciclo de Krebs y sus pasos clave.',
-      '¿Qué diferencias hay entre CRISPR-Cas9 y base editing?',
-      'Resume el paper original de transformers (2017).'
+      'What evidence supports dark matter?',
+      'Explain the Krebs cycle and its key steps.',
+      'What are the differences between CRISPR-Cas9 and base editing?',
+      'Summarize the original transformers paper (2017).'
     ];
 
     function addMessage(role, text) {
@@ -247,12 +302,12 @@
 
       const avatar = document.createElement('div');
       avatar.className = `avatar ${role === 'user' ? 'user' : 'bot'}`;
-      avatar.textContent = role === 'user' ? 'Tú' : 'IA';
+      avatar.textContent = role === 'user' ? 'You' : 'AI';
 
       const content = document.createElement('div');
       const meta = document.createElement('div');
       meta.className = 'meta';
-      meta.textContent = role === 'user' ? 'Usuario' : 'Asistente (eco)';
+      meta.textContent = role === 'user' ? 'User' : 'Assistant (echo)';
 
       const bubble = document.createElement('div');
       bubble.className = 'bubble';
@@ -271,7 +326,7 @@
       if (chatEl.childElementCount === 0) {
         const empty = document.createElement('div');
         empty.className = 'empty';
-        empty.textContent = 'Haz tu primera pregunta científica o prueba con un ejemplo.';
+        empty.textContent = 'Ask your first scientific question or try an example.';
         chatEl.appendChild(empty);
       }
     }
@@ -290,13 +345,13 @@
         const res = await fetch('http://127.0.0.1:8000/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text })
+          body: JSON.stringify({ message: text, use_agent: useAgent })
         });
-        if (!res.ok) throw new Error('Error del servidor');
+        if (!res.ok) throw new Error('Server error');
         const data = await res.json();
-        addMessage('bot', data.reply ?? 'Sin respuesta');
+        addMessage('bot', data.reply ?? 'No response');
       } catch (err) {
-        addMessage('bot', 'No pude conectar con el backend. Asegúrate de que está corriendo.');
+        addMessage('bot', 'Could not connect to the backend. Make sure it is running.');
         console.error(err);
       } finally {
         setLoading(false);
@@ -306,7 +361,7 @@
     function setLoading(isLoading) {
       sendBtn.disabled = isLoading;
       inputEl.disabled = isLoading;
-      sendBtn.textContent = isLoading ? 'Enviando...' : 'Enviar';
+      sendBtn.textContent = isLoading ? 'Sending...' : 'Send';
     }
 
     formEl.addEventListener('submit', (e) => {
@@ -330,6 +385,14 @@
         suggestionsEl.appendChild(pill);
       });
     }
+
+    function toggleMode() {
+      useAgent = !useAgent;
+      modeToggleEl.classList.toggle('active', useAgent);
+      modeLabelEl.textContent = useAgent ? 'Agent Mode' : 'Echo Mode';
+    }
+
+    modeToggleEl.addEventListener('click', toggleMode);
 
     renderEmptyState();
     renderPrompts();
