@@ -1,18 +1,35 @@
-# Science Chatbot (frontend + FastAPI backend)
+# Science Chatbot
 
-Interfaz tipo chat minimalista para preguntas científicas. El backend por ahora solo responde en modo eco (`Has dicho: ...`) y sirve como esqueleto para conectar futura lógica de búsqueda/citación.
+A ChatGPT-style interface for asking scientific questions with source citations. Built with FastAPI backend and vanilla JavaScript frontend, featuring LangGraph agents for intelligent information retrieval.
 
-## Estructura
+## 🎯 Features
 
-- `frontend/`: HTML/CSS/JS estático estilo ChatGPT.
-- `backend/`: API en FastAPI con endpoint `/api/chat` y un `/api/health`.
+- **Clean chat interface** inspired by modern AI assistants
+- **LangGraph agents** with tools for scientific search and citation
+- **RESTful API** built with FastAPI
+- **Modular architecture** ready for portfolio showcase
 
-## Requisitos previos
+## 📁 Project Structure
 
-- Python 3.10+ (recomendado)
-- Navegador moderno
+```
+science_chatbot/
+├── frontend/          # Static HTML/CSS/JS interface
+│   └── index.html
+├── backend/           # FastAPI server + LangGraph agents
+│   ├── main.py        # API endpoints
+│   ├── agents/        # LangGraph agent modules
+│   └── requirements.txt
+└── README.md
+```
 
-## Cómo levantar el backend (FastAPI)
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.10+ (recommended 3.11+)
+- Modern web browser
+
+### Backend Setup (FastAPI + LangGraph)
 
 ```powershell
 cd backend
@@ -22,31 +39,63 @@ pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-- El endpoint de prueba queda en `http://127.0.0.1:8000/api/chat`.
-- Salud: `http://127.0.0.1:8000/api/health`.
+API endpoints:
+- Health check: `http://127.0.0.1:8000/api/health`
+- Chat: `http://127.0.0.1:8000/api/chat`
 
-## Cómo servir el frontend
+### Frontend Setup
 
-1) En otra terminal, abre la carpeta `frontend` y levanta un servidor estático simple:
+In a separate terminal:
 
 ```powershell
 cd frontend
 python -m http.server 5500
 ```
 
-2) Abre el navegador en `http://127.0.0.1:5500/`.
+Open browser at `http://127.0.0.1:5500/`
 
-> Nota: El frontend apunta a `http://127.0.0.1:8000/api/chat`. Si cambias el puerto o dominio del backend, ajusta la URL dentro de `frontend/index.html` en la función `fetch`.
+> **Note:** Frontend expects backend at `http://127.0.0.1:8000/api/chat`. If you change the port, update the fetch URL in `frontend/index.html`.
 
-## Flujo esperado
+## 🔄 Current Status
 
-1. Escribe una pregunta científica en el cuadro de texto.
-2. El frontend envía `{"message": "..."}` al backend.
-3. El backend responde `{"reply": "Has dicho: ..."}`.
-4. El chat muestra el mensaje de usuario y la respuesta eco.
+**Phase 1** (Completed):
+- ✅ Frontend chat interface
+- ✅ FastAPI backend skeleton
+- ✅ Echo endpoint for testing
 
-## Próximos pasos sugeridos
+**Phase 2** (In Progress):
+- 🔨 LangGraph agent architecture
+- 🔨 Scientific search tools
+- 🔨 Citation formatting
 
-- Conectar a un motor de búsqueda académica / Wikipedia y devolver citas.
-- Agregar almacenamiento de historial en localStorage.
-- Añadir pruebas unitarias para la API con `pytest`.
+## 🛠️ Tech Stack
+
+- **Frontend:** Vanilla JavaScript, CSS3, HTML5
+- **Backend:** FastAPI, LangGraph, Python 3.11+
+- **AI/Agents:** LangGraph for agent orchestration
+- **Tools:** Wikipedia API, arXiv API (planned)
+
+## 📝 Usage Flow
+
+1. User types a scientific question in the chat input
+2. Frontend sends `{"message": "..."}` to backend
+3. Backend (currently) echoes: `{"reply": "You said: ..."}`
+4. Chat displays user message and bot response
+
+## 🎓 Portfolio Notes
+
+This project demonstrates:
+- Modern async Python with FastAPI
+- Agent-based architecture with LangGraph
+- Clean frontend-backend separation
+- RESTful API design
+- Modular code structure for scalability
+
+## 📋 Roadmap
+
+- [ ] Integrate LangGraph agents with search tools
+- [ ] Add Wikipedia and arXiv search capabilities
+- [ ] Implement citation formatting
+- [ ] Add conversation history persistence
+- [ ] Unit tests with pytest
+- [ ] Docker containerization
