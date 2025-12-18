@@ -1,0 +1,81 @@
+# ============================
+# Python
+# ============================
+
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.venv
+
+# Jupyter notebooks checkpoints (por si usás alguno)
+.ipynb_checkpoints/
+
+# ============================
+# Environment & Credentials
+# ============================
+
+.env
+.env.*
+*.env
+secret.json
+config.json
+
+# AWS credentials (nunca subir)
+.aws/
+
+# ============================
+# Editors & IDEs
+# ============================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ============================
+# Logs
+# ============================
+
+*.log
+logs/
+*.out
+*.err
+
+# ============================
+# Cache
+# ============================
+
+.cache/
+pip-wheel-metadata/
+pip-log.txt
+__pycache__/
+*.sqlite3
+
+# ============================
+# Node (si agregás un frontend)
+# ============================
+
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+build/
+
+# ============================
+# Byte-level / Misc
+# ============================
+
+.DS_Store
+Thumbs.db
