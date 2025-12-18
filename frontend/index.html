@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Science Chatbot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --panel: #ffffff;
+      --accent: #115e59;
+      --accent-2: #0d9488;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Space Grotesk', 'Segoe UI', Tahoma, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(13, 148, 136, 0.08), transparent 28%),
+                  radial-gradient(circle at 80% 10%, rgba(17, 94, 89, 0.08), transparent 24%),
+                  var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 24px 20px 8px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 32px;
+      letter-spacing: -0.02em;
+    }
+
+    .badge {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #ffffff;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      box-shadow: var(--shadow);
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    main {
+      max-width: 960px;
+      margin: 0 auto 32px;
+      padding: 0 20px 32px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 70vh;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 16px 16px 0;
+    }
+
+    .pill {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #f8fafc;
+      color: var(--text);
+      font-size: 14px;
+      cursor: pointer;
+      transition: border-color 120ms ease, transform 120ms ease;
+    }
+
+    .pill:hover { border-color: var(--accent-2); transform: translateY(-1px); }
+
+    .chat {
+      flex: 1;
+      padding: 0 16px;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .message {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 12px;
+      padding: 18px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .avatar.user { background: #0f172a; }
+    .avatar.bot { background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+
+    .bubble {
+      background: #f8fafc;
+      padding: 14px 16px;
+      border-radius: 14px;
+      line-height: 1.5;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    form {
+      border-top: 1px solid var(--border);
+      padding: 14px 16px 16px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      background: #f8fafc;
+    }
+
+    textarea {
+      width: 100%;
+      resize: none;
+      min-height: 60px;
+      max-height: 160px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 15px;
+      line-height: 1.4;
+      transition: border-color 120ms ease, box-shadow 120ms ease;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent-2);
+      box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+    }
+
+    button {
+      padding: 0 20px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #ffffff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+      box-shadow: 0 10px 30px rgba(13, 148, 136, 0.25);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    button:not(:disabled):hover { transform: translateY(-1px); }
+
+    @media (max-width: 640px) {
+      h1 { font-size: 26px; }
+      .card { min-height: 60vh; }
+      form { grid-template-columns: 1fr; }
+      button { height: 46px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title-row">
+      <h1>Science Chatbot</h1>
+      <span class="badge">Beta</span>
+    </div>
+    <p class="subtitle">Haz preguntas científicas y recibe respuestas con citas. (Por ahora: modo eco para probar el flujo).</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="pill-row" id="suggestions"></div>
+      <div class="chat" id="chat"></div>
+      <form id="chat-form">
+        <textarea id="input" placeholder="Escribe tu pregunta científica..." required></textarea>
+        <button type="submit" id="send">Enviar</button>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    const chatEl = document.getElementById('chat');
+    const formEl = document.getElementById('chat-form');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const suggestionsEl = document.getElementById('suggestions');
+
+    const prompts = [
+      '¿Qué evidencia respalda la materia oscura?',
+      'Explica el ciclo de Krebs y sus pasos clave.',
+      '¿Qué diferencias hay entre CRISPR-Cas9 y base editing?',
+      'Resume el paper original de transformers (2017).'
+    ];
+
+    function addMessage(role, text) {
+      const container = document.createElement('div');
+      container.className = 'message';
+
+      const avatar = document.createElement('div');
+      avatar.className = `avatar ${role === 'user' ? 'user' : 'bot'}`;
+      avatar.textContent = role === 'user' ? 'Tú' : 'IA';
+
+      const content = document.createElement('div');
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = role === 'user' ? 'Usuario' : 'Asistente (eco)';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = text;
+
+      content.appendChild(meta);
+      content.appendChild(bubble);
+      container.appendChild(avatar);
+      container.appendChild(content);
+
+      chatEl.appendChild(container);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function renderEmptyState() {
+      if (chatEl.childElementCount === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'Haz tu primera pregunta científica o prueba con un ejemplo.';
+        chatEl.appendChild(empty);
+      }
+    }
+
+    function clearEmptyState() {
+      if (chatEl.firstChild && chatEl.firstChild.classList.contains('empty')) {
+        chatEl.removeChild(chatEl.firstChild);
+      }
+    }
+
+    async function sendMessage(text) {
+      clearEmptyState();
+      addMessage('user', text);
+      setLoading(true);
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+        if (!res.ok) throw new Error('Error del servidor');
+        const data = await res.json();
+        addMessage('bot', data.reply ?? 'Sin respuesta');
+      } catch (err) {
+        addMessage('bot', 'No pude conectar con el backend. Asegúrate de que está corriendo.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function setLoading(isLoading) {
+      sendBtn.disabled = isLoading;
+      inputEl.disabled = isLoading;
+      sendBtn.textContent = isLoading ? 'Enviando...' : 'Enviar';
+    }
+
+    formEl.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = inputEl.value.trim();
+      if (!text) return;
+      inputEl.value = '';
+      sendMessage(text);
+    });
+
+    function renderPrompts() {
+      prompts.forEach((p) => {
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'pill';
+        pill.textContent = p;
+        pill.addEventListener('click', () => {
+          inputEl.value = p;
+          inputEl.focus();
+        });
+        suggestionsEl.appendChild(pill);
+      });
+    }
+
+    renderEmptyState();
+    renderPrompts();
+  </script>
+</body>
+</html>
