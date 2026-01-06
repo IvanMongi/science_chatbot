@@ -6,15 +6,19 @@ from typing import Literal
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langgraph.graph import MessagesState, StateGraph, START, END
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from .state import AgentState
 from .tools.wikipedia_search import search_wikipedia
 from .tools.arxiv_search import search_arxiv
 from .prompts import SYSTEM_PROMPT
+from config import settings
 
+# Define constants
+OPENAI_API_KEY = SecretStr(settings.openai_api_key) if settings.openai_api_key else None
 
 # Define the llm instance
-llm = ChatOpenAI(model="gpt-4.1-nano", temperature=1) 
+llm = ChatOpenAI(model="gpt-4.1-nano", temperature=1, api_key=OPENAI_API_KEY)
 
 def create_science_agent():
     """
@@ -40,17 +44,7 @@ def create_science_agent():
     # Compile the graph
     return workflow.compile()
 
-
-
-
-
-
-
-
-
-
-
-
+# TODO: Enhance with LLM calls for classification and answer generation
 async def classify_question(state: AgentState) -> AgentState:
     """
     Classify the user's question and determine search strategy.
@@ -111,8 +105,10 @@ async def generate_answer(state: AgentState) -> AgentState:
         
         if source == "Wikipedia":
             snippet = result.get("snippet", "")
+            extract = result.get("extract", "")
+            wiki_text = extract or snippet
             answer_parts.append(f"\n{idx}. From Wikipedia - {title}:")
-            answer_parts.append(f"   {snippet}")
+            answer_parts.append(f"   {wiki_text}")
             answer_parts.append(f"   [Source: {title} - {url}]")
             
         elif source == "arXiv":
@@ -147,6 +143,7 @@ async def run_agent(question: str) -> str:
     initial_state: AgentState = {
         "messages": [HumanMessage(content=question)],
         "question": question,
+        "search_strategy": "general",
         "search_results": [],
         "final_answer": ""
     }

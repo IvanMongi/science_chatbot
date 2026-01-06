@@ -12,6 +12,9 @@ class AgentState(MessagesState):
     question: str
     """The original user question."""
     
+    search_strategy: str
+    """Search strategy chosen for the query (e.g., 'papers' or 'general')."""
+    
     search_results: list[dict]
     """Search results from tools."""
     
