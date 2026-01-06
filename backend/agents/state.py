@@ -2,16 +2,12 @@
 State definition for the science agent graph.
 """
 
-from typing import TypedDict, Annotated, Sequence
-from langchain_core.messages import BaseMessage
-from langgraph.graph import add_messages
+from langgraph.graph import MessagesState
 
 
-class AgentState(TypedDict):
-    """State of the science agent."""
-    
-    messages: Annotated[Sequence[BaseMessage], add_messages]
-    """The conversation messages."""
+class AgentState(MessagesState):
+    """State of the science agent.
+    Subclass of Messages with additional fields."""
     
     question: str
     """The original user question."""

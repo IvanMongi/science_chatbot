@@ -4,26 +4,51 @@ LangGraph agent definition for scientific information retrieval.
 
 from typing import Literal
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from langgraph.graph import StateGraph, END
+from langgraph.graph import MessagesState, StateGraph, START, END
+from langchain_openai import ChatOpenAI
+
 from .state import AgentState
 from .tools.wikipedia_search import search_wikipedia
 from .tools.arxiv_search import search_arxiv
+from .prompts import SYSTEM_PROMPT
 
 
-# System prompt for the agent
-SYSTEM_PROMPT = """You are a scientific research assistant. Your role is to:
-1. Answer scientific questions accurately
-2. Search for reliable sources (Wikipedia for general info, arXiv for papers)
-3. Cite your sources properly
-4. Format answers clearly with proper citations
+# Define the llm instance
+llm = ChatOpenAI(model="gpt-4.1-nano", temperature=1) 
 
-When you receive a question:
-- Determine if you need to search for information
-- Use Wikipedia for general scientific concepts
-- Use arXiv for specific papers or recent research
-- Synthesize information from multiple sources
-- Always cite your sources in [Source: Title - URL] format
-"""
+def create_science_agent():
+    """
+    Create the LangGraph agent for scientific information retrieval.
+    
+    Returns:
+        Compiled StateGraph ready for execution
+    """
+    # Create the graph
+    workflow = StateGraph(AgentState)
+    
+    # Add nodes
+    workflow.add_node("classify", classify_question)
+    workflow.add_node("search", search_information)
+    workflow.add_node("generate", generate_answer)
+    
+    # Define the flow
+    workflow.add_edge(START, "classify")
+    workflow.add_edge("classify", "search")
+    workflow.add_edge("search", "generate")
+    workflow.add_edge("generate", END)
+    
+    # Compile the graph
+    return workflow.compile()
+
+
+
+
+
+
+
+
+
+
 
 
 async def classify_question(state: AgentState) -> AgentState:
@@ -104,31 +129,6 @@ async def generate_answer(state: AgentState) -> AgentState:
     
     state["final_answer"] = "\n".join(answer_parts)
     return state
-
-
-def create_science_agent() -> StateGraph:
-    """
-    Create the LangGraph agent for scientific information retrieval.
-    
-    Returns:
-        Compiled StateGraph ready for execution
-    """
-    # Create the graph
-    workflow = StateGraph(AgentState)
-    
-    # Add nodes
-    workflow.add_node("classify", classify_question)
-    workflow.add_node("search", search_information)
-    workflow.add_node("generate", generate_answer)
-    
-    # Define the flow
-    workflow.set_entry_point("classify")
-    workflow.add_edge("classify", "search")
-    workflow.add_edge("search", "generate")
-    workflow.add_edge("generate", END)
-    
-    # Compile the graph
-    return workflow.compile()
 
 
 # For testing/development

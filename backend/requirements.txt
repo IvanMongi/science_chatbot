@@ -5,3 +5,4 @@ langgraph==0.2.45
 langchain-core==0.3.15
 pydantic==2.9.0
 pydantic-settings==2.5.2
+langchain-openai==1.1.6
