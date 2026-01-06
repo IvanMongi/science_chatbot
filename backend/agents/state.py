@@ -15,8 +15,14 @@ class AgentState(MessagesState):
     search_strategy: str
     """Search strategy chosen for the query (e.g., 'papers' or 'general')."""
     
+    wiki_results: list[dict]
+    """Results returned from the Wikipedia tool."""
+
+    arxiv_results: list[dict]
+    """Results returned from the arXiv tool."""
+
     search_results: list[dict]
-    """Search results from tools."""
+    """Combined search results (kept for compatibility)."""
     
     final_answer: str
     """The formatted final answer with citations."""

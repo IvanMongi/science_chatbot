@@ -52,6 +52,7 @@ async def classify_question(state: AgentState) -> AgentState:
     question = state.get("question", "")
     
     # Simple classification logic - can be enhanced with LLM
+    #TODO : Use LLM for better classification
     needs_papers = any(keyword in question.lower() for keyword in [
         "paper", "study", "research", "publication", "arxiv", "recent"
     ])
@@ -66,6 +67,8 @@ async def search_information(state: AgentState) -> AgentState:
     """
     question = state.get("question", "")
     search_results = []
+    wiki_results: list[dict] = []
+    arxiv_results: list[dict] = []
     
     # Always search Wikipedia for context
     wiki_results = await search_wikipedia(question, limit=2)
@@ -77,6 +80,8 @@ async def search_information(state: AgentState) -> AgentState:
         arxiv_results = await search_arxiv(question, limit=2)
         search_results.extend(arxiv_results)
     
+    state["wiki_results"] = wiki_results
+    state["arxiv_results"] = arxiv_results
     state["search_results"] = search_results
     return state
 
@@ -84,46 +89,80 @@ async def search_information(state: AgentState) -> AgentState:
 async def generate_answer(state: AgentState) -> AgentState:
     """
     Generate final answer with citations from search results.
-    
-    This is a simple implementation. In a full version, you would use
-    an LLM to synthesize the information intelligently.
     """
     question = state.get("question", "")
-    search_results = state.get("search_results", [])
-    
-    if not search_results:
-        state["final_answer"] = "I couldn't find reliable sources for this question. Please try rephrasing or asking a different question."
+    wiki_results = state.get("wiki_results", [])
+    arxiv_results = state.get("arxiv_results", [])
+
+    if not wiki_results and not arxiv_results:
+        state["final_answer"] = (
+            "I couldn't find reliable sources for this question. "
+            "Please try rephrasing or asking a different question."
+        )
         return state
-    
-    # Build answer with citations (simplified version)
-    answer_parts = [f"Based on the available sources regarding '{question}':\n"]
-    
-    for idx, result in enumerate(search_results, 1):
-        source = result.get("source", "Unknown")
+
+    def _trim(text: str, limit: int = 500) -> str:
+        return text[:limit] + "..." if len(text) > limit else text
+
+    context_lines: list[str] = []
+
+    for idx, result in enumerate(wiki_results, 1):
         title = result.get("title", "Untitled")
         url = result.get("url", "")
-        
-        if source == "Wikipedia":
-            snippet = result.get("snippet", "")
-            extract = result.get("extract", "")
-            wiki_text = extract or snippet
-            answer_parts.append(f"\n{idx}. From Wikipedia - {title}:")
-            answer_parts.append(f"   {wiki_text}")
-            answer_parts.append(f"   [Source: {title} - {url}]")
-            
-        elif source == "arXiv":
-            authors = result.get("authors", "Unknown authors")
-            abstract = result.get("abstract", "")
-            # Truncate abstract if too long
-            abstract_preview = abstract[:200] + "..." if len(abstract) > 200 else abstract
-            answer_parts.append(f"\n{idx}. Paper: {title}")
-            answer_parts.append(f"   Authors: {authors}")
-            answer_parts.append(f"   {abstract_preview}")
-            answer_parts.append(f"   [Source: {title} - {url}]")
-    
-    answer_parts.append("\n\nNote: This is a prototype. In the full version, an LLM would synthesize this information into a coherent answer.")
-    
-    state["final_answer"] = "\n".join(answer_parts)
+        snippet = result.get("extract") or result.get("snippet", "")
+        context_lines.append(
+            f"[W{idx}] {title} :: {_trim(snippet)} (Source: {url})"
+        )
+
+    for idx, result in enumerate(arxiv_results, 1):
+        title = result.get("title", "Untitled")
+        url = result.get("url", "")
+        authors = result.get("authors", "Unknown authors")
+        abstract = _trim(result.get("abstract", ""))
+        context_lines.append(
+            f"[A{idx}] {title} :: Authors: {authors}. Abstract: {abstract} (Source: {url})"
+        )
+
+    context_block = "\n".join(context_lines) if context_lines else "No external context provided."
+
+    history_messages = state.get("messages", [])
+    history_text_lines = []
+    for msg in history_messages:
+        role = "user" if isinstance(msg, HumanMessage) else "assistant" if isinstance(msg, AIMessage) else "system"
+        history_text_lines.append(f"{role}: {msg.content}")
+    history_block = "\n".join(history_text_lines) if history_text_lines else "None provided."
+
+    user_prompt = f"""
+User question:
+{question}
+
+Conversation history (for future memory):
+{history_block}
+
+Available context:
+{context_block}
+
+Instructions:
+- Synthesize a clear, concise answer using the provided sources.
+- Cite each claim with the source identifiers (e.g., [W1], [A2]).
+- Add a short References section listing the cited IDs with their URLs.
+- If information is missing, say so explicitly and suggest a follow-up question.
+"""
+
+    messages = [
+        SystemMessage(content=SYSTEM_PROMPT),
+        *history_messages,
+        HumanMessage(content=user_prompt),
+    ]
+
+    try:
+        response = await llm.ainvoke(messages)
+        state["final_answer"] = response.content if hasattr(response, "content") else str(response)
+    except Exception:
+        state["final_answer"] = (
+            "I ran into an issue generating the answer. Please try again or adjust the question."
+        )
+
     return state
 
 
@@ -144,6 +183,8 @@ async def run_agent(question: str) -> str:
         "messages": [HumanMessage(content=question)],
         "question": question,
         "search_strategy": "general",
+        "wiki_results": [],
+        "arxiv_results": [],
         "search_results": [],
         "final_answer": ""
     }
