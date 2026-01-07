@@ -3,14 +3,79 @@ arXiv search tool for scientific papers.
 """
 
 import logging
-import httpx
-import xml.etree.ElementTree as ET
+import arxiv
 from typing import Optional
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
+from pydantic import SecretStr
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+from config import settings
 
 logger = logging.getLogger(__name__)
 
+# Initialize lightweight LLM for query transformation
+OPENAI_API_KEY = SecretStr(settings.openai_api_key) if settings.openai_api_key else None
+query_llm = ChatOpenAI(model="gpt-4o-nano", temperature=0, api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
-async def search_arxiv(query: str, limit: int = 3) -> list[dict]:
+
+def transform_query_to_arxiv(natural_query: str) -> str:
+    """
+    Transform a natural language query into an optimized arXiv search query.
+    Uses a lightweight LLM to extract key terms and apply logical operators.
+    
+    Args:
+        natural_query: Natural language query from the user
+        
+    Returns:
+        Optimized arXiv search query string
+    """
+    if not query_llm:
+        # Fallback: extract key terms from natural query
+        logger.warning("No LLM available for query transformation, using fallback")
+
+        # Simple fallback: remove question words and quotes
+        cleaned = natural_query
+        for word in ["summarize", "the", "what", "is", "are", "how", "why", "when", "where", "paper"]:
+            cleaned = cleaned.replace(word, "").replace(word.capitalize(), "")
+        return cleaned.strip()
+    
+    system_prompt = """You are an arXiv search query optimizer. Convert natural language queries into effective arXiv search queries.
+
+arXiv query syntax:
+- ti:"term" - search in title
+- abs:term - search in abstract
+- au:author - search by author
+- cat:category - search by category (e.g., cs.AI, cs.CL)
+- all:term - search all fields
+- AND, OR, ANDNOT - logical operators
+
+Examples:
+- "Summarize the original transformers paper (2017)" → ti:"attention is all you need" OR (abs:transformer AND submittedDate:[2017 TO 2018])
+- "Papers about BERT" → ti:BERT OR abs:BERT
+- "Recent work on reinforcement learning" → abs:"reinforcement learning"
+- "GPT-3 papers" → ti:GPT-3 OR abs:GPT-3
+
+Return ONLY the optimized arXiv query, nothing else."""
+    
+    try:
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=natural_query)
+        ]
+        response = query_llm.invoke(messages)
+        optimized_query = response.content.strip()
+        logger.info("Query transformed: %r -> %r", natural_query, optimized_query)
+        return optimized_query
+    except Exception as e:
+        logger.error("Query transformation failed: %s. Using original query.", e)
+        return natural_query
+
+
+async def search_arxiv(query: str, limit: int = 5) -> list[dict]:
     """
     Search arXiv for scientific papers.
     
@@ -21,67 +86,42 @@ async def search_arxiv(query: str, limit: int = 3) -> list[dict]:
     Returns:
         List of paper results with title, authors, abstract, and URL
     """
-    base_url = "http://export.arxiv.org/api/query"
-    
-    params = {
-        "search_query": f"all:{query}",
-        "start": 0,
-        "max_results": limit,
-        "sortBy": "relevance",
-        "sortOrder": "descending"
-    }
-    
     logger.info("arXiv search start: query=%r limit=%d", query, limit)
 
     try:
-        async with httpx.AsyncClient() as client:
-            logger.debug("arXiv request: url=%s params=%s", base_url, params)
-            response = await client.get(base_url, params=params, timeout=15.0)
-            logger.debug("arXiv response status: %s bytes=%d", response.status_code, len(response.content or b""))
-            response.raise_for_status()
+        # Transform natural language query to optimized arXiv query
+        search_query = transform_query_to_arxiv(query)
+        search = arxiv.Search(
+            query=search_query,
+            max_results=limit,
+            sort_by=arxiv.SortCriterion.Relevance
+        )
 
-            # Parse XML response
-            root = ET.fromstring(response.content)
-            ns = {"atom": "http://www.w3.org/2005/Atom"}
+        # Use the Client for searching
+        client = arxiv.Client()
+        
+        # Execute the search
+        results_iter = client.results(search)
+        
+        results = []
+        for result in results_iter:
+            results.append({
+                "title": result.title,
+                "authors": ", ".join([author.name for author in result.authors]),
+                "abstract": result.summary,
+                "url": result.entry_id,
+                "source": "arXiv"
+            })
 
-            entries = root.findall("atom:entry", ns)
-            results = []
-            for entry in entries:
-                title_elem = entry.find("atom:title", ns)
-                summary_elem = entry.find("atom:summary", ns)
-                id_elem = entry.find("atom:id", ns)
+        logger.info("arXiv search done: results=%d", len(results))
+        if not results:
+            logger.warning("arXiv returned no results for query=%r", query)
+        else:
+            sample = ", ".join(r.get("title", "") for r in results[:3])
+            logger.debug("arXiv top titles: %s", sample)
 
-                # Get authors
-                authors = []
-                for author in entry.findall("atom:author", ns):
-                    name_elem = author.find("atom:name", ns)
-                    if name_elem is not None and name_elem.text:
-                        authors.append(name_elem.text)
+        return results
 
-                if title_elem is not None and title_elem.text:
-                    results.append({
-                        "title": title_elem.text.strip(),
-                        "authors": ", ".join(authors) if authors else "Unknown",
-                        "abstract": summary_elem.text.strip() if summary_elem is not None and summary_elem.text else "",
-                        "url": id_elem.text.strip() if id_elem is not None and id_elem.text else "",
-                        "source": "arXiv"
-                    })
-
-            logger.info("arXiv search done: entries=%d results=%d", len(entries), len(results))
-            if not results:
-                logger.warning("arXiv returned no results for query=%r", query)
-            else:
-                sample = ", ".join(r.get("title", "") for r in results[:3])
-                logger.debug("arXiv top titles: %s", sample)
-
-            return results
-
-    except httpx.HTTPError as http_err:
-        logger.exception("arXiv HTTP error for query=%r: %s", query, http_err)
-        return []
-    except ET.ParseError as parse_err:
-        logger.exception("arXiv XML parse error for query=%r: %s", query, parse_err)
-        return []
     except Exception as e:
         logger.exception("arXiv search error for query=%r: %s", query, e)
         return []
@@ -98,67 +138,42 @@ def search_arxiv_sync(query: str, limit: int = 3) -> list[dict]:
     Returns:
         List of paper results with title, authors, abstract, and URL
     """
-    base_url = "http://export.arxiv.org/api/query"
-    
-    params = {
-        "search_query": f"all:{query}",
-        "start": 0,
-        "max_results": limit,
-        "sortBy": "relevance",
-        "sortOrder": "descending"
-    }
-    
     logger.info("arXiv sync search start: query=%r limit=%d", query, limit)
 
     try:
-        with httpx.Client() as client:
-            logger.debug("arXiv sync request: url=%s params=%s", base_url, params)
-            response = client.get(base_url, params=params, timeout=15.0)
-            logger.debug("arXiv sync response status: %s bytes=%d", response.status_code, len(response.content or b""))
-            response.raise_for_status()
+        # Transform natural language query to optimized arXiv query
+        search_query = transform_query_to_arxiv(query)
+        search = arxiv.Search(
+            query=search_query,
+            max_results=limit,
+            sort_by=arxiv.SortCriterion.Relevance
+        )
 
-            # Parse XML response
-            root = ET.fromstring(response.content)
-            ns = {"atom": "http://www.w3.org/2005/Atom"}
+        # Use the Client for searching
+        client = arxiv.Client()
+        
+        # Execute the search
+        results_iter = client.results(search)
+        
+        results = []
+        for result in results_iter:
+            results.append({
+                "title": result.title,
+                "authors": ", ".join([author.name for author in result.authors]),
+                "abstract": result.summary,
+                "url": result.entry_id,
+                "source": "arXiv"
+            })
 
-            entries = root.findall("atom:entry", ns)
-            results = []
-            for entry in entries:
-                title_elem = entry.find("atom:title", ns)
-                summary_elem = entry.find("atom:summary", ns)
-                id_elem = entry.find("atom:id", ns)
+        logger.info("arXiv sync search done: results=%d", len(results))
+        if not results:
+            logger.warning("arXiv sync returned no results for query=%r", query)
+        else:
+            sample = ", ".join(r.get("title", "") for r in results[:3])
+            logger.debug("arXiv sync top titles: %s", sample)
 
-                # Get authors
-                authors = []
-                for author in entry.findall("atom:author", ns):
-                    name_elem = author.find("atom:name", ns)
-                    if name_elem is not None and name_elem.text:
-                        authors.append(name_elem.text)
+        return results
 
-                if title_elem is not None and title_elem.text:
-                    results.append({
-                        "title": title_elem.text.strip(),
-                        "authors": ", ".join(authors) if authors else "Unknown",
-                        "abstract": summary_elem.text.strip() if summary_elem is not None and summary_elem.text else "",
-                        "url": id_elem.text.strip() if id_elem is not None and id_elem.text else "",
-                        "source": "arXiv"
-                    })
-
-            logger.info("arXiv sync search done: entries=%d results=%d", len(entries), len(results))
-            if not results:
-                logger.warning("arXiv sync returned no results for query=%r", query)
-            else:
-                sample = ", ".join(r.get("title", "") for r in results[:3])
-                logger.debug("arXiv sync top titles: %s", sample)
-
-            return results
-
-    except httpx.HTTPError as http_err:
-        logger.exception("arXiv sync HTTP error for query=%r: %s", query, http_err)
-        return []
-    except ET.ParseError as parse_err:
-        logger.exception("arXiv sync XML parse error for query=%r: %s", query, parse_err)
-        return []
     except Exception as e:
         logger.exception("arXiv sync search error for query=%r: %s", query, e)
         return []
