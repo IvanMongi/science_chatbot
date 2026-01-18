@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from config import settings
 
 logger = logging.getLogger(__name__)
+# Suppress verbose logs from HTTP clients
+logging.getLogger('httpx').setLevel(logging.ERROR)
+logging.getLogger('httpcore').setLevel(logging.ERROR)
 
 # Initialize lightweight LLM for query transformation
 OPENAI_API_KEY = SecretStr(settings.openai_api_key) if settings.openai_api_key else None
@@ -68,7 +71,6 @@ Return ONLY the optimized arXiv query, nothing else."""
         ]
         response = query_llm.invoke(messages)
         optimized_query = response.content.strip()
-        logger.info("Query transformed: %r -> %r", natural_query, optimized_query)
         return optimized_query
     except Exception as e:
         logger.error("Query transformation failed: %s. Using original query.", e)
@@ -86,7 +88,7 @@ async def search_arxiv(query: str, limit: int = 5) -> list[dict]:
     Returns:
         List of paper results with title, authors, abstract, and URL
     """
-    logger.info("arXiv search start: query=%r limit=%d", query, limit)
+    logger.info("arXiv search start")
 
     try:
         # Transform natural language query to optimized arXiv query
@@ -118,7 +120,6 @@ async def search_arxiv(query: str, limit: int = 5) -> list[dict]:
             logger.warning("arXiv returned no results for query=%r", query)
         else:
             sample = ", ".join(r.get("title", "") for r in results[:3])
-            logger.debug("arXiv top titles: %s", sample)
 
         return results
 
@@ -138,7 +139,7 @@ def search_arxiv_sync(query: str, limit: int = 3) -> list[dict]:
     Returns:
         List of paper results with title, authors, abstract, and URL
     """
-    logger.info("arXiv sync search start: query=%r limit=%d", query, limit)
+    logger.info("arXiv sync search start")
 
     try:
         # Transform natural language query to optimized arXiv query

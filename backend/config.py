@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     
     # Logging
     log_level: str = "INFO"
+
+    # Wikimedia bot compliance
+    # Provide a compliant User-Agent per Wikimedia policy, including contact info.
+    # Example: "science-chatbot/0.2.0 (+https://your-site.example; contact: you@example.com)"
+    wikimedia_user_agent: Optional[str] = None
+    # Requests-per-second throttle for Wikimedia endpoints (Action API recommends <5 unauthenticated)
+    wikimedia_rps: float = 1.0
+
+    WIKIMEDIA_USER_AGENT: str = "science-chatbot/0.2.0 (local for my portfolio; contact: ivanmatiasmongi@gmail.com)"
     
     class Config:
         env_file = ".env"
