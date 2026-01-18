@@ -17,6 +17,7 @@ from .tools.wikipedia_search import search_wikipedia
 from .tools.arxiv_search import search_arxiv
 from .prompts import SYSTEM_PROMPT
 from config import settings
+from persistence import get_checkpointer
 
 # Set up loggerToolMessage
 logger = logging.getLogger(__name__)
@@ -75,7 +76,7 @@ def create_science_agent():
     Create the LangGraph agent for scientific information retrieval.
     
     Returns:
-        Compiled StateGraph ready for execution
+        Compiled StateGraph ready for execution with persistence
     """
     # Create the graph
     workflow = StateGraph(AgentState)
@@ -92,11 +93,14 @@ def create_science_agent():
     )
     workflow.add_edge("tools", "generate")
     
-    # Compile the graph
-    agent = workflow.compile()
+    # Compile the graph with persistence
+    checkpointer = get_checkpointer()
+    agent = workflow.compile(checkpointer=checkpointer)
 
     # Show
     display(Image(agent.get_graph(xray=True).draw_mermaid_png()))
+
+    return agent
 
     return agent
 

@@ -11,32 +11,36 @@
   <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1"></script>
 </head>
 <body>
-  <header>
-    <div class="title-row">
-      <h1>Science Chatbot</h1>
-      <span class="badge">Beta</span>
-    </div>
-    <p class="subtitle">Ask scientific questions and get answers with citations.</p>
-  </header>
+  <div class="app-container">
+    <aside id="threads-sidebar" class="sidebar"></aside>
+    
+    <main class="main-content">
+      <header>
+        <div class="title-row">
+          <h1>Science Chatbot</h1>
+          <span class="badge">Beta</span>
+        </div>
+        <p class="subtitle">Ask scientific questions and get answers with citations.</p>
+      </header>
 
-  <main>
-    <section class="card">
-      <div class="pill-row">
-        <div id="suggestions" style="display: flex; flex-wrap: wrap; gap: 10px; flex: 1;"></div>
-        <div class="mode-toggle">
-          <span id="mode-label">Echo Mode</span>
-          <div class="toggle-switch" id="mode-toggle">
-            <div class="toggle-knob"></div>
+      <section class="card">
+        <div class="pill-row">
+          <div id="suggestions" style="display: flex; flex-wrap: wrap; gap: 10px; flex: 1;"></div>
+          <div class="mode-toggle">
+            <span id="mode-label">Echo Mode</span>
+            <div class="toggle-switch" id="mode-toggle">
+              <div class="toggle-knob"></div>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="chat" id="chat"></div>
-      <form id="chat-form">
-        <textarea id="input" placeholder="Type your scientific question..." required></textarea>
-        <button type="submit" id="send">Send</button>
-      </form>
-    </section>
-  </main>
+        <div class="chat" id="chat"></div>
+        <form id="chat-form">
+          <textarea id="input" placeholder="Type your scientific question..." required></textarea>
+          <button type="submit" id="send">Send</button>
+        </form>
+      </section>
+    </main>
+  </div>
 
   <script src="script.js"></script>
 </body>
