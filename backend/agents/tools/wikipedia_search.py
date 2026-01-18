@@ -102,7 +102,6 @@ async def wiki_search(query: str, limit: int = 5, lang: str = "en") -> list[dict
 
     Each result contains: title, pageid, snippet, url, source.
     """
-    logger.info("wiki_search start (REST)")
 
     try:
         async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=1, max_connections=5)) as client:
@@ -124,7 +123,6 @@ async def wiki_search(query: str, limit: int = 5, lang: str = "en") -> list[dict
                 "source": "Wikipedia",
             })
 
-        logger.info("wiki_search done: items=%d results=%d", len(items), len(results))
         if results:
             sample = ", ".join(r.get("title", "") for r in results[:3])
         else:
@@ -164,7 +162,6 @@ async def wiki_get_page(*, title: Optional[str] = None, pageid: Optional[int] = 
                     "url": page_url,
                     "source": "Wikipedia",
                 }
-                logger.info("wiki_get_page done (REST)")
                 return result
             # Fallback to Action API if only pageid is given
             page_param = {"pageids": str(pageid)}
@@ -198,7 +195,6 @@ async def wiki_get_page(*, title: Optional[str] = None, pageid: Optional[int] = 
                 "url": page_url,
                 "source": "Wikipedia",
             }
-            logger.info("wiki_get_page done (Action API fallback)")
             return result
 
     except httpx.HTTPError as http_err:
