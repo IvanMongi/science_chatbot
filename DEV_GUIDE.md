@@ -171,6 +171,15 @@ async def search_information(state: AgentState) -> AgentState:
 - Review timeout settings in tool files
 - Check httpx version compatibility
 
+### Wikimedia Robot Policy Compliance
+To prevent 403 errors from Wikipedia, configure a compliant User-Agent and keep request rates low:
+
+- Set environment variable `WIKIMEDIA_USER_AGENT` (or in `.env`) to include your app name, version, and a contact method.
+  Example: `science-chatbot/0.2.0 (+https://your-site.example; contact: you@example.com)`
+- Optionally set `WIKIMEDIA_RPS` (default `1.0`) to throttle requests per second.
+- The tool prefers REST cached endpoints and respects `Retry-After` on `429`.
+- Keep concurrent requests to 1 and overall under 5 rps when unauthenticated.
+
 ## Testing
 
 ### Manual Testing
