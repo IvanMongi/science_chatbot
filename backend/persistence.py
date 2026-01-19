@@ -8,6 +8,7 @@ import sqlite3
 from datetime import datetime
 from typing import Optional
 from langgraph.checkpoint.memory import MemorySaver
+from sqlite3 import Connection
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ DATABASE_PATH = "./conversations.db"
 _memory_saver = None
 
 
-def _get_db_connection():
+def _get_db_connection() -> Connection:
     """Get a database connection."""
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
@@ -201,6 +202,32 @@ def update_thread_metadata(thread_id: str, message_count: int = None, preview: s
         
         # Return updated thread
         return get_thread(thread_id)
+    finally:
+        conn.close()
+
+
+def update_thread_title(thread_id: str, title: str) -> bool:
+    """Update only the thread title.
+
+    Returns True on success, False if the thread does not exist or an error occurs.
+    """
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            """
+            UPDATE conversation_threads
+            SET title = ?
+            WHERE thread_id = ?
+            """,
+            (title, thread_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Error updating thread %s: %s", thread_id, exc)
+        return False
     finally:
         conn.close()
 

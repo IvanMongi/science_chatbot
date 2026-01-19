@@ -1,16 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from agents.graph import create_science_agent
+from agents.graph import get_science_agent
 from persistence import (
-    create_thread, list_threads, delete_thread, get_thread, update_thread_metadata,
-    save_messages_to_db, load_messages_from_db, get_messages_for_display, _get_db_connection
+    create_thread,
+    list_threads,
+    delete_thread,
+    get_thread,
+    update_thread_metadata,
+    update_thread_title,
+    save_messages_to_db,
+    load_messages_from_db,
+    get_messages_for_display,
 )
 from langchain_core.messages import HumanMessage
 import logging
 import uuid
-from typing import Optional
 from config import settings
+from schemas import ChatRequest, ChatResponse, ThreadSummary, ThreadUpdateRequest
 
 
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -18,49 +24,24 @@ logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.I
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Science Chatbot API",
-    version="0.2.0",
-    description="Scientific information retrieval chatbot with LangGraph agents"
+    title=settings.api_title,
+    version=settings.api_version,
+    description="Scientific information retrieval chatbot with LangGraph agents",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-class ChatRequest(BaseModel):
-    message: str
-    thread_id: Optional[str] = None
-    use_agent: bool = False
-
-
-class ChatResponse(BaseModel):
-    reply: str
-    thread_id: str
-    mode: str
-
-
-class ThreadUpdateRequest(BaseModel):
-    title: str
-
-
-class ThreadSummary(BaseModel):
-    thread_id: str
-    title: str
-    preview: str
-    created_at: str
-    updated_at: str
-    message_count: int
-
-
 @app.get("/api/health")
 async def health() -> dict:
     """Health check endpoint."""
-    return {"status": "ok", "version": "0.2.0"}
+    return {"status": "ok", "version": settings.api_version}
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -86,7 +67,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
         new_user_message = HumanMessage(content=req.message)
         all_messages = existing_messages + [new_user_message]
         
-        agent = create_science_agent()
+        agent = get_science_agent()
         
         # Invoke agent with all messages (existing + new)
         initial_state = {"messages": all_messages}
@@ -154,23 +135,11 @@ async def update_thread_endpoint(thread_id: str, req: ThreadUpdateRequest) -> di
         return {"error": "Thread not found", "success": False}
     
     # Update only the title
-    conn = _get_db_connection()
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute("""
-            UPDATE conversation_threads
-            SET title = ?
-            WHERE thread_id = ?
-        """, (req.title, thread_id))
-        conn.commit()
-        logger.info(f"Updated thread {thread_id} title to: {req.title}")
-        return {"success": True, "thread_id": thread_id, "title": req.title}
-    except Exception as e:
-        logger.error(f"Error updating thread {thread_id}: {e}")
-        return {"success": False, "error": str(e)}
-    finally:
-        conn.close()
+    updated = update_thread_title(thread_id, req.title)
+    if not updated:
+        return {"success": False, "error": "Update failed"}
+    logger.info(f"Updated thread {thread_id} title to: {req.title}")
+    return {"success": True, "thread_id": thread_id, "title": req.title}
 
 
 @app.get("/api/threads/{thread_id}")
@@ -208,7 +177,7 @@ async def get_thread_messages(thread_id: str) -> dict:
 async def agent_status() -> dict:
     """Check if agent mode is available."""
     try:
-        agent = create_science_agent()
+        agent = get_science_agent()
         return {
             "available": True,
             "message": "LangGraph agent is ready"
