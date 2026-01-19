@@ -291,8 +291,28 @@ async function loadThread(threadId) {
   chatEl.innerHTML = '';
   renderThreadsSidebar();
   
-  // TODO: In a future enhancement, fetch and display previous messages for this thread
-  // For now, MemorySaver handles this automatically when we pass the thread_id to /api/chat
+  // Fetch and display previous messages for this thread
+  try {
+    const res = await fetch(`${CONFIG.apiBaseUrl}/api/threads/${threadId}/messages`);
+    if (!res.ok) {
+      throw new Error('Failed to load messages');
+    }
+    
+    const data = await res.json();
+    const messages = data.messages || [];
+    
+    if (messages.length === 0) {
+      renderEmptyState();
+    } else {
+      // Display all previous messages
+      messages.forEach(msg => {
+        addMessage(msg.role === 'user' ? 'user' : 'bot', msg.content);
+      });
+    }
+  } catch (err) {
+    console.error('Error loading thread messages:', err);
+    addMessage('bot', 'Could not load previous messages.');
+  }
 }
 
 /**

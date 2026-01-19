@@ -40,6 +40,25 @@ def _init_db():
         )
     """)
     
+    # Create messages table for storing individual messages
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            thread_id TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
+            content TEXT NOT NULL,
+            tool_calls TEXT,
+            tool_call_id TEXT,
+            created_at TEXT NOT NULL,
+            message_index INTEGER NOT NULL,
+            FOREIGN KEY (thread_id) REFERENCES conversation_threads(thread_id) ON DELETE CASCADE,
+            UNIQUE (thread_id, message_index)
+        )
+    """)
+    
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_thread_id ON messages(thread_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)")
+    
     conn.commit()
     conn.close()
 
@@ -182,5 +201,151 @@ def update_thread_metadata(thread_id: str, message_count: int = None, preview: s
         
         # Return updated thread
         return get_thread(thread_id)
+    finally:
+        conn.close()
+
+
+def save_messages_to_db(thread_id: str, messages: list) -> None:
+    """Save new messages to database for persistence and display."""
+    import json
+    from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
+    
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Get current max index
+        cursor.execute(
+            "SELECT MAX(message_index) FROM messages WHERE thread_id = ?",
+            (thread_id,)
+        )
+        result = cursor.fetchone()
+        max_index = result[0] if result[0] is not None else -1
+        
+        # Get existing message count to detect new messages
+        cursor.execute(
+            "SELECT COUNT(*) FROM messages WHERE thread_id = ?",
+            (thread_id,)
+        )
+        existing_count = cursor.fetchone()[0]
+        
+        # Only save messages beyond what's already stored
+        new_messages = messages[existing_count:]
+        
+        for idx, msg in enumerate(new_messages):
+            message_index = max_index + idx + 1
+            
+            # Extract message data
+            role = msg.__class__.__name__.replace("Message", "").lower()
+            if role == "ai":
+                role = "assistant"
+            elif role == "human":
+                role = "user"
+            
+            content = msg.content if hasattr(msg, 'content') else ""
+            tool_calls_json = None
+            tool_call_id = None
+            
+            if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                # Serialize tool calls to JSON
+                tool_calls_json = json.dumps([{
+                    'name': tc.get('name') if isinstance(tc, dict) else getattr(tc, 'name', None),
+                    'args': tc.get('args') if isinstance(tc, dict) else getattr(tc, 'args', {}),
+                    'id': tc.get('id') if isinstance(tc, dict) else getattr(tc, 'id', None)
+                } for tc in msg.tool_calls])
+            
+            if hasattr(msg, 'tool_call_id'):
+                tool_call_id = msg.tool_call_id
+            
+            now = datetime.utcnow().isoformat()
+            
+            cursor.execute("""
+                INSERT INTO messages (thread_id, role, content, tool_calls, tool_call_id, created_at, message_index)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (thread_id, role, content, tool_calls_json, tool_call_id, now, message_index))
+        
+        conn.commit()
+        logger.info(f"Saved {len(new_messages)} new messages for thread {thread_id}")
+    except Exception as e:
+        logger.error(f"Error saving messages for thread {thread_id}: {e}")
+        raise
+    finally:
+        conn.close()
+
+
+def load_messages_from_db(thread_id: str) -> list:
+    """Load conversation history from database."""
+    import json
+    from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
+    
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("""
+            SELECT role, content, tool_calls, tool_call_id
+            FROM messages
+            WHERE thread_id = ?
+            ORDER BY message_index
+        """, (thread_id,))
+        
+        db_messages = cursor.fetchall()
+        messages = []
+        
+        for row in db_messages:
+            role = row[0]
+            content = row[1]
+            tool_calls_json = row[2]
+            tool_call_id = row[3]
+            
+            if role == "user":
+                messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                ai_msg = AIMessage(content=content)
+                if tool_calls_json:
+                    try:
+                        ai_msg.tool_calls = json.loads(tool_calls_json)
+                    except:
+                        pass
+                messages.append(ai_msg)
+            elif role == "tool":
+                messages.append(ToolMessage(
+                    content=content,
+                    tool_call_id=tool_call_id or ""
+                ))
+            elif role == "system":
+                messages.append(SystemMessage(content=content))
+        
+        logger.info(f"Loaded {len(messages)} messages for thread {thread_id}")
+        return messages
+    except Exception as e:
+        logger.error(f"Error loading messages for thread {thread_id}: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_messages_for_display(thread_id: str) -> list[dict]:
+    """Get messages formatted for frontend display (excluding system/tool messages)."""
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("""
+            SELECT role, content, created_at
+            FROM messages
+            WHERE thread_id = ? AND role IN ('user', 'assistant')
+            ORDER BY message_index
+        """, (thread_id,))
+        
+        messages = []
+        for row in cursor.fetchall():
+            messages.append({
+                "role": row[0],
+                "content": row[1],
+                "created_at": row[2]
+            })
+        
+        return messages
     finally:
         conn.close()

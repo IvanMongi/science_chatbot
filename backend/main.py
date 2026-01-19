@@ -2,7 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agents.graph import create_science_agent
-from persistence import create_thread, list_threads, delete_thread, get_thread, update_thread_metadata
+from persistence import (
+    create_thread, list_threads, delete_thread, get_thread, update_thread_metadata,
+    save_messages_to_db, load_messages_from_db, get_messages_for_display
+)
 from langchain_core.messages import HumanMessage
 import logging
 import uuid
@@ -71,14 +74,25 @@ async def chat(req: ChatRequest) -> ChatResponse:
         create_thread(thread_id=thread_id, title="New Conversation", preview=req.message[:50])
     
     try:
+        # Load existing messages from database
+        existing_messages = load_messages_from_db(thread_id)
+        logger.info(f"Loaded {len(existing_messages)} existing messages for thread {thread_id}")
+        
+        # Add new user message
+        new_user_message = HumanMessage(content=req.message)
+        all_messages = existing_messages + [new_user_message]
+        
         agent = create_science_agent()
         
-        # Invoke agent with thread config (use async API)
-        initial_state = {"messages": [HumanMessage(content=req.message)]}
+        # Invoke agent with all messages (existing + new)
+        initial_state = {"messages": all_messages}
         result = await agent.ainvoke(initial_state, config)
         
         # Extract final answer
         answer = result['messages'][-1].content
+        
+        # Save all messages to database (function handles deduplication)
+        save_messages_to_db(thread_id, result['messages'])
         
         # Update thread metadata
         update_thread_metadata(
@@ -141,6 +155,21 @@ async def get_thread_endpoint(thread_id: str) -> dict:
         "created_at": thread.get('created_at'),
         "updated_at": thread.get('updated_at'),
         "message_count": thread.get('message_count')
+    }
+
+
+@app.get("/api/threads/{thread_id}/messages")
+async def get_thread_messages(thread_id: str) -> dict:
+    """Get all messages for a thread (for frontend display)."""
+    # Check if thread exists
+    thread = get_thread(thread_id)
+    if not thread:
+        return {"error": "Thread not found", "messages": []}
+    
+    messages = get_messages_for_display(thread_id)
+    return {
+        "thread_id": thread_id,
+        "messages": messages
     }
 
 

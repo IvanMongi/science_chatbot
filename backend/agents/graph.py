@@ -97,10 +97,11 @@ def create_science_agent():
     checkpointer = get_checkpointer()
     agent = workflow.compile(checkpointer=checkpointer)
 
-    # Show
-    display(Image(agent.get_graph(xray=True).draw_mermaid_png()))
-
-    return agent
+    # Show graph visualization (optional - only works in Jupyter)
+    try:
+        display(Image(agent.get_graph(xray=True).draw_mermaid_png()))
+    except:
+        pass  # Skip if not in Jupyter environment
 
     return agent
 
