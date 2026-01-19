@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from agents.graph import create_science_agent
 from persistence import (
     create_thread, list_threads, delete_thread, get_thread, update_thread_metadata,
-    save_messages_to_db, load_messages_from_db, get_messages_for_display
+    save_messages_to_db, load_messages_from_db, get_messages_for_display, _get_db_connection
 )
 from langchain_core.messages import HumanMessage
 import logging
@@ -42,6 +42,10 @@ class ChatResponse(BaseModel):
     reply: str
     thread_id: str
     mode: str
+
+
+class ThreadUpdateRequest(BaseModel):
+    title: str
 
 
 class ThreadSummary(BaseModel):
@@ -140,6 +144,33 @@ async def delete_thread_endpoint(thread_id: str) -> dict:
     """Delete a conversation thread."""
     success = delete_thread(thread_id)
     return {"success": success, "thread_id": thread_id}
+
+
+@app.put("/api/threads/{thread_id}")
+async def update_thread_endpoint(thread_id: str, req: ThreadUpdateRequest) -> dict:
+    """Update thread title."""
+    thread = get_thread(thread_id)
+    if not thread:
+        return {"error": "Thread not found", "success": False}
+    
+    # Update only the title
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("""
+            UPDATE conversation_threads
+            SET title = ?
+            WHERE thread_id = ?
+        """, (req.title, thread_id))
+        conn.commit()
+        logger.info(f"Updated thread {thread_id} title to: {req.title}")
+        return {"success": True, "thread_id": thread_id, "title": req.title}
+    except Exception as e:
+        logger.error(f"Error updating thread {thread_id}: {e}")
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
 
 
 @app.get("/api/threads/{thread_id}")

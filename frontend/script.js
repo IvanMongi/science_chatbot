@@ -236,6 +236,46 @@ async function loadThreads() {
 }
 
 /**
+ * Edit a thread name
+ * @param {string} threadId - Thread ID to edit
+ * @param {string} currentTitle - Current thread title
+ */
+async function editThreadName(threadId, currentTitle) {
+  const newTitle = prompt('Enter new chat name:', currentTitle);
+  
+  if (newTitle === null) return; // User cancelled
+  if (newTitle.trim() === '') {
+    alert('Chat name cannot be empty');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${CONFIG.apiBaseUrl}/api/threads/${threadId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle.trim() })
+    });
+
+    if (!res.ok) throw new Error('Failed to update thread name');
+
+    const data = await res.json();
+    if (data.success) {
+      // Update local thread data
+      const thread = threads.find(t => t.thread_id === threadId);
+      if (thread) {
+        thread.title = newTitle.trim();
+      }
+      renderThreadsSidebar();
+    } else {
+      alert('Failed to update chat name');
+    }
+  } catch (err) {
+    console.error('Error editing thread name:', err);
+    alert('Could not update chat name');
+  }
+}
+
+/**
  * Render threads in sidebar
  */
 function renderThreadsSidebar() {
@@ -268,16 +308,32 @@ function renderThreadsSidebar() {
     content.appendChild(title);
     content.appendChild(preview);
     
+    const actions = document.createElement('div');
+    actions.className = 'thread-actions';
+    
+    const editBtn = document.createElement('button');
+    editBtn.className = 'thread-edit';
+    editBtn.textContent = '✎';
+    editBtn.title = 'Edit chat name';
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editThreadName(thread.thread_id, thread.title);
+    });
+    
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'thread-delete';
     deleteBtn.textContent = '✕';
+    deleteBtn.title = 'Delete conversation';
     deleteBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       deleteThread(thread.thread_id);
     });
     
+    actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
+    
     item.appendChild(content);
-    item.appendChild(deleteBtn);
+    item.appendChild(actions);
     threadList.appendChild(item);
   });
 }
