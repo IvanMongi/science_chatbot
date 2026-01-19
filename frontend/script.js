@@ -9,6 +9,8 @@ const modeLabelEl = document.getElementById('mode-label');
 
 // State
 let useAgent = true;
+let currentThreadId = null;
+let threads = [];
 
 // Configuration
 const CONFIG = {
@@ -20,6 +22,98 @@ const CONFIG = {
     'Summarize the original transformers paper (2017).'
   ]
 };
+
+/**
+ * Fetch and display all threads
+ */
+async function loadThreads() {
+  try {
+    const res = await fetch(`${CONFIG.apiBaseUrl}/api/threads`);
+    const data = await res.json();
+    threads = data.threads || [];
+    renderThreadsSidebar();
+  } catch (err) {
+    console.error('Error loading threads:', err);
+  }
+}
+
+/**
+ * Render threads in sidebar
+ */
+function renderThreadsSidebar() {
+  const sidebar = document.getElementById('threads-sidebar');
+  if (!sidebar) return;
+  
+  sidebar.innerHTML = '<h3>Conversations</h3><button id="new-chat-btn" class="new-chat">+ New Chat</button>';
+  
+  threads.forEach(thread => {
+    const item = document.createElement('div');
+    item.className = `thread-item ${thread.thread_id === currentThreadId ? 'active' : ''}`;
+    item.innerHTML = `
+      <div class="thread-content">
+        <div class="thread-title">${thread.title}</div>
+        <div class="thread-preview">${thread.preview}</div>
+      </div>
+      <button class="thread-delete" data-thread-id="${thread.thread_id}">×</button>
+    `;
+    
+    item.querySelector('.thread-content').addEventListener('click', () => {
+      loadThread(thread.thread_id);
+    });
+    
+    item.querySelector('.thread-delete').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteThread(thread.thread_id);
+    });
+    
+    sidebar.appendChild(item);
+  });
+  
+  document.getElementById('new-chat-btn').addEventListener('click', startNewChat);
+}
+
+/**
+ * Load a specific thread
+ */
+async function loadThread(threadId) {
+  currentThreadId = threadId;
+  chatEl.innerHTML = '';
+  renderThreadsSidebar();
+}
+
+/**
+ * Start a new chat
+ */
+function startNewChat() {
+  currentThreadId = null;
+  chatEl.innerHTML = '';
+  renderEmptyState();
+  renderThreadsSidebar();
+  inputEl.focus();
+}
+
+/**
+ * Delete a thread
+ */
+async function deleteThread(threadId) {
+  if (!confirm('Delete this conversation?')) return;
+  
+  try {
+    const res = await fetch(`${CONFIG.apiBaseUrl}/api/threads/${threadId}`, {
+      method: 'DELETE'
+    });
+    
+    if (res.ok) {
+      threads = threads.filter(t => t.thread_id !== threadId);
+      if (currentThreadId === threadId) {
+        startNewChat();
+      }
+      renderThreadsSidebar();
+    }
+  } catch (err) {
+    console.error('Error deleting thread:', err);
+  }
+}
 
 /**
  * Add a message to the chat display
@@ -96,7 +190,11 @@ async function sendMessage(text) {
     const res = await fetch(`${CONFIG.apiBaseUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, use_agent: useAgent })
+      body: JSON.stringify({
+        message: text,
+        thread_id: currentThreadId,
+        use_agent: useAgent
+      })
     });
 
     if (!res.ok) {
@@ -105,11 +203,150 @@ async function sendMessage(text) {
 
     const data = await res.json();
     addMessage('bot', data.reply ?? 'No response');
+
+    // Update current thread if this was a new chat
+    if (data.thread_id && !currentThreadId) {
+      currentThreadId = data.thread_id;
+    }
+
+    // Refresh thread list and UI
+    await loadThreads();
   } catch (err) {
     addMessage('bot', 'Could not connect to the backend. Make sure it is running.');
     console.error('Chat error:', err);
   } finally {
     setLoading(false);
+  }
+}
+
+/**
+ * Load all threads from backend
+ */
+async function loadThreads() {
+  try {
+    const res = await fetch(`${CONFIG.apiBaseUrl}/api/threads`);
+    if (!res.ok) throw new Error('Failed to load threads');
+    
+    const data = await res.json();
+    threads = data.threads || [];
+    renderThreadsSidebar();
+  } catch (err) {
+    console.error('Error loading threads:', err);
+  }
+}
+
+/**
+ * Render threads in sidebar
+ */
+function renderThreadsSidebar() {
+  const sidebarEl = document.getElementById('threads-sidebar');
+  const threadList = sidebarEl.querySelector('.thread-list') || (() => {
+    const list = document.createElement('div');
+    list.className = 'thread-list';
+    sidebarEl.appendChild(list);
+    return list;
+  })();
+
+  threadList.innerHTML = '';
+
+  threads.forEach(thread => {
+    const item = document.createElement('div');
+    item.className = `thread-item ${thread.thread_id === currentThreadId ? 'active' : ''}`;
+    
+    const content = document.createElement('div');
+    content.className = 'thread-content';
+    content.addEventListener('click', () => loadThread(thread.thread_id));
+    
+    const title = document.createElement('div');
+    title.className = 'thread-title';
+    title.textContent = thread.title || 'Untitled';
+    
+    const preview = document.createElement('div');
+    preview.className = 'thread-preview';
+    preview.textContent = thread.preview || 'No messages';
+    
+    content.appendChild(title);
+    content.appendChild(preview);
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'thread-delete';
+    deleteBtn.textContent = '✕';
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteThread(thread.thread_id);
+    });
+    
+    item.appendChild(content);
+    item.appendChild(deleteBtn);
+    threadList.appendChild(item);
+  });
+}
+
+/**
+ * Load a specific thread
+ * @param {string} threadId - Thread ID to load
+ */
+async function loadThread(threadId) {
+  currentThreadId = threadId;
+  chatEl.innerHTML = '';
+  renderThreadsSidebar();
+  
+  // Fetch and display previous messages for this thread
+  try {
+    const res = await fetch(`${CONFIG.apiBaseUrl}/api/threads/${threadId}/messages`);
+    if (!res.ok) {
+      throw new Error('Failed to load messages');
+    }
+    
+    const data = await res.json();
+    const messages = data.messages || [];
+    
+    if (messages.length === 0) {
+      renderEmptyState();
+    } else {
+      // Display all previous messages
+      messages.forEach(msg => {
+        addMessage(msg.role === 'user' ? 'user' : 'bot', msg.content);
+      });
+    }
+  } catch (err) {
+    console.error('Error loading thread messages:', err);
+    addMessage('bot', 'Could not load previous messages.');
+  }
+}
+
+/**
+ * Start a new chat
+ */
+function startNewChat() {
+  currentThreadId = null;
+  chatEl.innerHTML = '';
+  renderEmptyState();
+  renderThreadsSidebar();
+}
+
+/**
+ * Delete a thread
+ * @param {string} threadId - Thread ID to delete
+ */
+async function deleteThread(threadId) {
+  if (!confirm('Delete this conversation?')) return;
+
+  try {
+    const res = await fetch(`${CONFIG.apiBaseUrl}/api/threads/${threadId}`, {
+      method: 'DELETE'
+    });
+
+    if (!res.ok) throw new Error('Failed to delete thread');
+
+    if (currentThreadId === threadId) {
+      startNewChat();
+    } else {
+      await loadThreads();
+    }
+  } catch (err) {
+    console.error('Error deleting thread:', err);
+    alert('Failed to delete conversation');
   }
 }
 
@@ -162,15 +399,28 @@ function initializeEventListeners() {
   });
 
   modeToggleEl.addEventListener('click', toggleMode);
+
+  // Set up new chat button
+  const sidebarEl = document.getElementById('threads-sidebar');
+  const newChatBtn = document.createElement('button');
+  newChatBtn.className = 'new-chat';
+  newChatBtn.textContent = '+ New Chat';
+  newChatBtn.addEventListener('click', startNewChat);
+  
+  // Insert at top of sidebar
+  sidebarEl.insertBefore(newChatBtn, sidebarEl.firstChild);
 }
 
 /**
  * Initialize the application
  */
-function initialize() {
+async function initialize() {
   // Set up initial UI state
   modeToggleEl.classList.add('active');
   modeLabelEl.textContent = 'Agent Mode';
+
+  // Load existing threads
+  await loadThreads();
 
   // Render UI
   renderEmptyState();
