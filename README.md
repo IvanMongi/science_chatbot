@@ -90,10 +90,6 @@ See [MIGRATION_GUIDE.md](backend/MIGRATION_GUIDE.md) for detailed information ab
 - ✅ Thread management (create, list, delete)
 - ✅ Message history across server restarts
 
-**Phase 3** (In Progress):
-- 🔨 Enhanced citation formatting
-- 🔨 Advanced search strategies
-- 🔨 Production deployment
 
 ## 🛠️ Tech Stack
 
@@ -123,6 +119,16 @@ This project demonstrates:
 - RESTful API design
 - Modular code structure for scalability
 
+## 🔮 Future Upgrades
+
+- Cross-chat memory: store user preferences and profile for personalized answers across threads.
+- Additional tools: integrate internet search and other client-relevant data sources.
+
+## 🙏 Acknowledgements
+
+- Thanks to LangChain Academy for the original learning material and LangGraph documentation that inspired and accelerated this project.
+- Development was assisted by GitHub Copilot to speed up implementation and iteration.
+
 ## 📋 Roadmap
 
 - [x] Integrate LangGraph agents with search tools
@@ -133,4 +139,3 @@ This project demonstrates:
 - [ ] Conversation export functionality
 - [ ] Unit tests with pytest
 - [ ] Production deployment with Docker
-- [ ] Docker containerization

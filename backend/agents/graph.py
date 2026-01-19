@@ -3,6 +3,7 @@ LangGraph agent definition for scientific information retrieval.
 """
 import json
 import logging
+from functools import lru_cache
 from typing import Any, Literal
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage
 from langgraph.graph import StateGraph, START, END
@@ -104,6 +105,12 @@ def create_science_agent():
         pass  # Skip if not in Jupyter environment
 
     return agent
+
+
+@lru_cache(maxsize=1)
+def get_science_agent():
+    """Return a cached science agent instance to avoid rebuilding the graph per request."""
+    return create_science_agent()
 
 
 async def generate_answer(state: AgentState):
