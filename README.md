@@ -15,12 +15,25 @@ A ChatGPT-style interface for asking scientific questions with source citations.
 
 ```
 science_chatbot/
-├── frontend/          # Static HTML/CSS/JS interface
-│   └── index.html
-├── backend/           # FastAPI server + LangGraph agents
-│   ├── main.py        # API endpoints
-│   ├── agents/        # LangGraph agent modules
-│   └── requirements.txt
+├── frontend/                    # Static HTML/CSS/JS interface
+│   ├── index.html              # Main chat UI
+│   ├── script.js               # Frontend logic
+│   └── styles.css              # Styling
+├── backend/                     # FastAPI server + LangGraph agents
+│   ├── main.py                 # API endpoints
+│   ├── config.py               # Configuration (OpenAI keys, settings)
+│   ├── persistence.py          # SQLite conversation storage
+│   ├── schemas.py              # Pydantic data models
+│   ├── requirements.txt        # Python dependencies
+│   ├── agents/                 # LangGraph agent modules
+│   │   ├── graph.py            # Agent workflow graph
+│   │   ├── state.py            # Agent state schema
+│   │   ├── prompts.py          # System and tool prompts
+│   │   └── tools/              # Search and utility tools
+│   │       ├── arxiv_search.py
+│   │       └── wikipedia_search.py
+│   ├── test_persistence.py     # Database tests
+│   └── test_message_persistence.py
 └── README.md
 ```
 
@@ -30,8 +43,14 @@ science_chatbot/
 
 - Python 3.10+ (recommended 3.11+)
 - Modern web browser
+- OpenAI API key
+
+### Configuration
+
+**Important:** Before running the backend, you must set up your OpenAI API key in `backend/config.py`. Open the file and configure your API key in the appropriate settings. This key is required by the LangGraph agent to generate responses and interact with OpenAI's models.
 
 ### Backend Setup (FastAPI + LangGraph)
+
 
 ```powershell
 cd backend
@@ -40,10 +59,6 @@ python -m venv .venv
 pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
-
-API endpoints:
-- Health check: `http://127.0.0.1:8000/api/health`
-- Chat: `http://127.0.0.1:8000/api/chat`
 
 ### Frontend Setup
 
@@ -73,8 +88,6 @@ The chatbot now features full conversation persistence using SQLite:
 cd backend
 python test_message_persistence.py
 ```
-
-See [MIGRATION_GUIDE.md](backend/MIGRATION_GUIDE.md) for detailed information about the persistence implementation.
 
 ## �🔄 Current Status
 
