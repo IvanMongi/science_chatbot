@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from agents.graph import get_science_agent
@@ -56,7 +60,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
     
     # Create thread if new
     if not req.thread_id:
-        create_thread(thread_id=thread_id, title="New Conversation", preview=req.message[:50])
+        create_thread(thread_id=thread_id, title=req.message[:60], preview=req.message[:50])
     
     try:
         # Load existing messages from database
