@@ -25,6 +25,8 @@ science_chatbot/
 │   ├── persistence.py          # SQLite conversation storage
 │   ├── schemas.py              # Pydantic data models
 │   ├── requirements.txt        # Python dependencies
+│   ├── pytest.ini              # Pytest configuration
+│   ├── .env.example             # Template for backend/.env
 │   ├── agents/                 # LangGraph agent modules
 │   │   ├── graph.py            # Agent workflow graph
 │   │   ├── state.py            # Agent state schema
@@ -32,8 +34,9 @@ science_chatbot/
 │   │   └── tools/              # Search and utility tools
 │   │       ├── arxiv_search.py
 │   │       └── wikipedia_search.py
-│   ├── test_persistence.py     # Database tests
-│   └── test_message_persistence.py
+│   └── tests/                  # Pytest test suite
+│       ├── test_persistence.py
+│       └── test_message_persistence.py
 └── README.md
 ```
 
@@ -47,7 +50,14 @@ science_chatbot/
 
 ### Configuration
 
-**Important:** Before running the backend, you must set up your OpenAI API key in `backend/config.py`. Open the file and configure your API key in the appropriate settings. This key is required by the LangGraph agent to generate responses and interact with OpenAI's models.
+**Important:** Before running the backend, copy `backend/.env.example` to `backend/.env` and fill in your values:
+
+```powershell
+cd backend
+copy .env.example .env
+```
+
+At minimum, set `OPENAI_API_KEY` — it's required by the LangGraph agent to generate responses and interact with OpenAI's models. LangSmith tracing (`LANGSMITH_*`) is optional; leave `LANGSMITH_TRACING=false` to disable it.
 
 ### Backend Setup (FastAPI + LangGraph)
 
@@ -86,7 +96,7 @@ The chatbot now features full conversation persistence using SQLite:
 
 ```powershell
 cd backend
-python test_message_persistence.py
+pytest
 ```
 
 ## �🔄 Current Status
@@ -150,5 +160,5 @@ This project demonstrates:
 - [x] Add conversation history persistence
 - [ ] Enhanced message search and filtering
 - [ ] Conversation export functionality
-- [ ] Unit tests with pytest
+- [x] Unit tests with pytest
 - [ ] Production deployment with Docker

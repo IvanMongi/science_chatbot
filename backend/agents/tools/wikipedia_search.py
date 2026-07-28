@@ -47,7 +47,7 @@ def _rest_summary_url(title: str, lang: str = "en") -> str:
 
 
 def _wiki_headers() -> dict:
-    ua = settings.wikimedia_user_agent or f"science-chatbot/{settings.api_version} (+local; contact: set WIKIMEDIA_USER_AGENT)"
+    ua = settings.WIKIMEDIA_USER_AGENT
     return {
         "User-Agent": ua,
         "Accept-Encoding": "gzip",

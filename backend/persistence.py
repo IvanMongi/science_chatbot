@@ -361,7 +361,7 @@ def get_messages_for_display(thread_id: str) -> list[dict]:
         cursor.execute("""
             SELECT role, content, created_at
             FROM messages
-            WHERE thread_id = ? AND role IN ('user', 'assistant')
+            WHERE thread_id = ? AND role IN ('user', 'assistant') AND content <> ''
             ORDER BY message_index
         """, (thread_id,))
         

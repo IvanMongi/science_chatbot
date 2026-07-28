@@ -2,13 +2,9 @@
 Test persistence layer functionality.
 """
 import sys
-import os
 import tempfile
 import sqlite3
 from datetime import datetime
-
-# Add backend to path
-sys.path.insert(0, os.path.dirname(__file__))
 
 from persistence import (
     get_checkpointer,
